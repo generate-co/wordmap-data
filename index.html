@@ -1,63 +1,137 @@
-<script>
-const canvas = document.querySelector("canvas");
-const ctx = canvas.getContext("2d");
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Word Map - Canvas</title>
+  <style>
+    html, body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+      background: #fff;
+    }
+    #search {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      padding: 6px;
+      font-size: 16px;
+    }
+    #version {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 4px 8px;
+      font-size: 12px;
+      font-family: monospace;
+      color: #555;
+      border-radius: 4px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <input id="search" type="text" placeholder="Search word..." />
+  <div id="version">v0.3.1</div>
+  <canvas></canvas>
 
-const WIDTH = canvas.width;
-const HEIGHT = canvas.height;
-let transform = d3.zoomIdentity;
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    const VERSION = "v0.3.1"; // ← バージョン番号をここで管理
+    document.getElementById("version").textContent = VERSION;
 
-const URL = "word_positions_1500000_clean.json?t=" + Date.now(); // キャッシュバスター
-let data = [];
+    const canvas = document.querySelector("canvas");
+    const ctx = canvas.getContext("2d");
+    const searchInput = document.getElementById("search");
 
-fetch(URL)
-  .then(res => res.json())
-  .then(json => {
-    data = json;
+    const WIDTH = window.innerWidth;
+    const HEIGHT = window.innerHeight;
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
 
-    // データの範囲（元の座標は -10〜10とかかも）
-    const xExtent = d3.extent(data, d => d.x);
-    const yExtent = d3.extent(data, d => d.y);
+    const URL = "word_positions_1500000_clean.json?t=" + Date.now(); // キャッシュ防止
+    let data = [];
+    let transform = d3.zoomIdentity;
+    let xScale, yScale;
 
-    // キャンバス座標への変換
-    xScale = d3.scaleLinear().domain(xExtent).range([0, WIDTH]);
-    yScale = d3.scaleLinear().domain(yExtent).range([0, HEIGHT]);
+    fetch(URL)
+      .then(res => res.json())
+      .then(json => {
+        data = json;
 
-    render(); // 初回描画
-  });
+        // 座標スケーリング
+        const xExtent = d3.extent(data, d => d.x);
+        const yExtent = d3.extent(data, d => d.y);
+        xScale = d3.scaleLinear().domain(xExtent).range([0, WIDTH]);
+        yScale = d3.scaleLinear().domain(yExtent).range([0, HEIGHT]);
 
-function render() {
-  ctx.clearRect(0, 0, WIDTH, HEIGHT);
-  ctx.save();
-  ctx.translate(transform.x, transform.y);
-  ctx.scale(transform.k, transform.k);
+        render();
+      });
 
-  for (let i = 0; i < data.length; i++) {
-    const d = data[i];
-    const fontSize = 10;
-    const screenSize = fontSize * transform.k;
-    if (screenSize < 3) continue;
+    const zoom = d3.zoom()
+      .scaleExtent([0.05, 50])
+      .on("zoom", (event) => {
+        transform = event.transform;
+        render();
+      });
 
-    const x = xScale(d.x);
-    const y = yScale(d.y);
+    d3.select(canvas).call(zoom);
 
-    ctx.font = `${fontSize}px sans-serif`;
-    ctx.fillStyle = "black";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(d.word, x, y);
-  }
+    function render() {
+      ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      ctx.save();
+      ctx.translate(transform.x, transform.y);
+      ctx.scale(transform.k, transform.k);
 
-  ctx.restore();
-}
+      const baseFontSize = 10;
 
-const zoom = d3.zoom()
-  .scaleExtent([0.1, 50])
-  .on("zoom", (event) => {
-    transform = event.transform;
-    render();
-  });
+      for (let i = 0; i < data.length; i++) {
+        const d = data[i];
 
-d3.select(canvas).call(zoom);
-</script>
+        const screenFontSize = baseFontSize * transform.k;
+        if (screenFontSize < 2.5) continue; // 小さすぎる語は表示しない
+
+        const x = xScale(d.x);
+        const y = yScale(d.y);
+
+        ctx.font = `${baseFontSize}px sans-serif`;
+        ctx.fillStyle = "#000";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(d.word, x, y);
+      }
+
+      ctx.restore();
+    }
+
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const word = searchInput.value.trim().toLowerCase();
+        const found = data.find(d => d.word.toLowerCase() === word);
+        if (found) {
+          const x = xScale(found.x);
+          const y = yScale(found.y);
+          const targetScale = 8;
+          const tx = WIDTH / 2 - x * targetScale;
+          const ty = HEIGHT / 2 - y * targetScale;
+
+          d3.select(canvas)
+            .transition()
+            .duration(600)
+            .call(
+              zoom.transform,
+              d3.zoomIdentity.translate(tx, ty).scale(targetScale)
+            );
+        } else {
+          alert("Word not found.");
+        }
+      }
+    });
+  </script>
+</body>
+</html>
