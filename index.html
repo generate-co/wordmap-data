@@ -17,9 +17,12 @@
       position: absolute;
       top: 10px;
       left: 10px;
-      z-index: 10;
+      z-index: 100;
       padding: 6px;
       font-size: 16px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
     #version {
       position: absolute;
@@ -31,23 +34,37 @@
       font-family: monospace;
       color: #555;
       border-radius: 4px;
-      z-index: 10;
+      z-index: 100;
+    }
+    #counter {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 4px 8px;
+      font-size: 12px;
+      font-family: monospace;
+      color: #555;
+      border-radius: 4px;
+      z-index: 100;
     }
   </style>
 </head>
 <body>
   <input id="search" type="text" placeholder="Search word..." />
-  <div id="version">v0.3.1</div>
+  <div id="version">v0.3.2</div>
+  <div id="counter">0 words</div>
   <canvas></canvas>
 
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script>
-    const VERSION = "v0.3.1"; // ← バージョン番号をここで管理
+    const VERSION = "v0.3.2";
     document.getElementById("version").textContent = VERSION;
 
     const canvas = document.querySelector("canvas");
     const ctx = canvas.getContext("2d");
     const searchInput = document.getElementById("search");
+    const counter = document.getElementById("counter");
 
     const WIDTH = window.innerWidth;
     const HEIGHT = window.innerHeight;
@@ -63,13 +80,10 @@
       .then(res => res.json())
       .then(json => {
         data = json;
-
-        // 座標スケーリング
         const xExtent = d3.extent(data, d => d.x);
         const yExtent = d3.extent(data, d => d.y);
         xScale = d3.scaleLinear().domain(xExtent).range([0, WIDTH]);
         yScale = d3.scaleLinear().domain(yExtent).range([0, HEIGHT]);
-
         render();
       });
 
@@ -89,24 +103,43 @@
       ctx.scale(transform.k, transform.k);
 
       const baseFontSize = 10;
+      const zoomK = transform.k;
+      let visibleCount = 0;
 
       for (let i = 0; i < data.length; i++) {
         const d = data[i];
-
-        const screenFontSize = baseFontSize * transform.k;
-        if (screenFontSize < 2.5) continue; // 小さすぎる語は表示しない
-
         const x = xScale(d.x);
         const y = yScale(d.y);
+
+        // 実スクリーン座標に変換
+        const screenX = x * zoomK + transform.x;
+        const screenY = y * zoomK + transform.y;
+
+        // 画面外の単語は描画しない
+        if (
+          screenX < -50 || screenX > WIDTH + 50 ||
+          screenY < -50 || screenY > HEIGHT + 50
+        ) {
+          continue;
+        }
+
+        // フォントが小さすぎる場合はスキップ
+        const screenFontSize = baseFontSize * zoomK;
+        if (screenFontSize < 2.5) continue;
 
         ctx.font = `${baseFontSize}px sans-serif`;
         ctx.fillStyle = "#000";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(d.word, x, y);
+
+        visibleCount++;
       }
 
       ctx.restore();
+
+      // 表示中語数の更新
+      counter.textContent = `${visibleCount} words`;
     }
 
     searchInput.addEventListener("keydown", (e) => {
