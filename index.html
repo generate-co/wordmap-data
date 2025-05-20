@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Word Map - 3D Full Interactive</title>
+  <title>Word Map - Optimized</title>
   <style>
     html, body {
       margin: 0;
@@ -29,12 +29,12 @@
   </style>
 </head>
 <body>
-  <div id="version">v0.5.1</div>
+  <div id="version">v0.5.2</div>
   <canvas></canvas>
 
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script>
-    const VERSION = "v0.5.1";
+    const VERSION = "v0.5.2";
     document.getElementById("version").textContent = VERSION;
 
     const canvas = document.querySelector("canvas");
@@ -57,14 +57,19 @@
     let dragVelocity = 0;
     const decay = 0.95;
 
+    const MAX_WORDS = 15000;
     const URL = "word_positions_1500000_clean.json?t=" + Date.now();
 
     fetch(URL)
       .then(res => res.json())
       .then(json => {
-        data = json;
+        // ✅ 頻出順でランク昇順ソート → 上位15000語のみ使用
+        data = json
+          .filter(d => typeof d.rank === "number")
+          .sort((a, b) => a.rank - b.rank)
+          .slice(0, MAX_WORDS);
 
-        // ✅ 正規化
+        // ✅ x/y/z を視覚用に正規化
         const xExtent = d3.extent(data, d => d.x);
         const yExtent = d3.extent(data, d => d.y);
         const zExtent = d3.extent(data, d => d.z);
@@ -82,7 +87,7 @@
         requestAnimationFrame(render);
       });
 
-    // 🖱 マウスドラッグ制御
+    // 🖱 マウスドラッグによる視点操作
     canvas.addEventListener("mousedown", e => {
       dragging = true;
       lastX = e.clientX;
@@ -103,19 +108,15 @@
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-      // ⬅️ 回転角度の更新
       if (!dragging) dragVelocity *= decay;
       angle += dragVelocity + 0.0005;
 
       const sinA = Math.sin(angle);
       const cosA = Math.cos(angle);
 
-      const sorted = [...data].sort((a, b) => b.z - a.z); // 奥から順
+      for (let i = 0; i < data.length; i++) {
+        const d = data[i];
 
-      for (let i = 0; i < sorted.length; i++) {
-        const d = sorted[i];
-
-        // 🌀 Y軸回転
         const x3D = d.x * cosA - d.z * sinA;
         const z3D = d.x * sinA + d.z * cosA;
         const y3D = d.y;
@@ -125,7 +126,6 @@
         const screenY = y3D * perspective + centerY;
         const fontSize = baseFontSize * perspective;
 
-        // 🎨 アルファ値（zが遠いほど薄く）
         const maxZ = 1.5;
         const alpha = Math.max(0.1, 1 - (z3D / maxZ));
 
