@@ -35,8 +35,8 @@
   <div id="version">v1.0.6r</div>
 
   <script type="module">
-    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+    import * as THREE from './libs/three.module.js';
+    import { OrbitControls } from './libs/OrbitControls.js';
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 2000);
@@ -52,7 +52,7 @@
     controls.target.set(0, 0, 0);
     controls.update();
 
-    // 仮データ
+    // 仮データ（後で入れ替える）
     const allData = [
       { word: "at", x: 0, y: 0, z: 0, rank: 1 },
       { word: "to", x: 50, y: 10, z: 20, rank: 2 },
