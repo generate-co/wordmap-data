@@ -1,96 +1,63 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Word Map - Canvas Version</title>
-  <style>
-    html, body { margin: 0; overflow: hidden; }
-    #search {
-      position: absolute;
-      top: 10px; left: 10px;
-      z-index: 10;
-      padding: 6px;
-      font-size: 16px;
-    }
-    canvas {
-      display: block;
-      background: #fff;
-    }
-  </style>
-</head>
-<body>
-  <input id="search" type="text" placeholder="Search word..." />
-  <canvas></canvas>
+<script>
+const canvas = document.querySelector("canvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script>
-    const canvas = document.querySelector("canvas");
-    const ctx = canvas.getContext("2d");
-    const searchInput = document.getElementById("search");
+const WIDTH = canvas.width;
+const HEIGHT = canvas.height;
+let transform = d3.zoomIdentity;
 
-    const WIDTH = window.innerWidth;
-    const HEIGHT = window.innerHeight;
-    canvas.width = WIDTH;
-    canvas.height = HEIGHT;
+const URL = "word_positions_1500000_clean.json?t=" + Date.now(); // キャッシュバスター
+let data = [];
 
-    const URL = "word_positions_1500000_clean.json";
-    let data = [];
-    let transform = d3.zoomIdentity;
+fetch(URL)
+  .then(res => res.json())
+  .then(json => {
+    data = json;
 
-    fetch(URL).then(res => res.json()).then(json => {
-      data = json;
-      render();
-    });
+    // データの範囲（元の座標は -10〜10とかかも）
+    const xExtent = d3.extent(data, d => d.x);
+    const yExtent = d3.extent(data, d => d.y);
 
-    const zoom = d3.zoom()
-      .scaleExtent([0.1, 50])
-      .on("zoom", (event) => {
-        transform = event.transform;
-        render();
-      });
+    // キャンバス座標への変換
+    xScale = d3.scaleLinear().domain(xExtent).range([0, WIDTH]);
+    yScale = d3.scaleLinear().domain(yExtent).range([0, HEIGHT]);
 
-    d3.select(canvas).call(zoom);
+    render(); // 初回描画
+  });
 
-    function render() {
-      ctx.clearRect(0, 0, WIDTH, HEIGHT);
-      ctx.save();
-      ctx.translate(transform.x, transform.y);
-      ctx.scale(transform.k, transform.k);
+function render() {
+  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  ctx.save();
+  ctx.translate(transform.x, transform.y);
+  ctx.scale(transform.k, transform.k);
 
-      for (let i = 0; i < data.length; i++) {
-        const d = data[i];
-        const fontSize = 10; // 元サイズ
-        const screenSize = fontSize * transform.k;
-        if (screenSize < 3) continue; // 小さすぎる語は描かない
+  for (let i = 0; i < data.length; i++) {
+    const d = data[i];
+    const fontSize = 10;
+    const screenSize = fontSize * transform.k;
+    if (screenSize < 3) continue;
 
-        ctx.font = `${fontSize}px sans-serif`;
-        ctx.fillStyle = "black";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(d.word, d.x, d.y);
-      }
+    const x = xScale(d.x);
+    const y = yScale(d.y);
 
-      ctx.restore();
-    }
+    ctx.font = `${fontSize}px sans-serif`;
+    ctx.fillStyle = "black";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(d.word, x, y);
+  }
 
-    searchInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        const word = searchInput.value.toLowerCase();
-        const found = data.find(d => d.word.toLowerCase() === word);
-        if (found) {
-          const targetX = found.x;
-          const targetY = found.y;
-          const k = 8;
-          const tx = WIDTH / 2 - targetX * k;
-          const ty = HEIGHT / 2 - targetY * k;
+  ctx.restore();
+}
 
-          d3.select(canvas).transition().duration(500).call(
-            zoom.transform,
-            d3.zoomIdentity.translate(tx, ty).scale(k)
-          );
-        }
-      }
-    });
-  </script>
-</body>
-</html>
+const zoom = d3.zoom()
+  .scaleExtent([0.1, 50])
+  .on("zoom", (event) => {
+    transform = event.transform;
+    render();
+  });
+
+d3.select(canvas).call(zoom);
+</script>
