@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Word Map - Three.js v1.0.0</title>
+  <title>Word Map - Three.js v1.0.1</title>
   <style>
     body {
       margin: 0;
@@ -36,7 +36,7 @@
 </head>
 <body>
   <input id="search" type="text" placeholder="Search word..." />
-  <div id="version">v1.0.0</div>
+  <div id="version">v1.0.1</div>
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
@@ -62,7 +62,10 @@
     fetch(URL)
       .then(res => res.json())
       .then(json => {
-        allData = json.filter(d => d.word && d.x != null && d.y != null && d.z != null);
+        allData = json
+          .filter(d => d.word && d.rank != null)
+          .sort((a, b) => a.rank - b.rank)
+          .slice(0, 150000);
 
         // 正規化
         const xExtent = d3.extent(allData, d => d.x);
@@ -109,7 +112,6 @@
       if (e.key === 'Enter') {
         const word = e.target.value.trim();
         if (word) {
-          // Clear scene and re-focus
           while (scene.children.length > 0) {
             scene.remove(scene.children[0]);
           }
