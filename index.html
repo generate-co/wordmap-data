@@ -1,14 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Word Map - Three.js v1.0.3</title>
+  <meta charset="UTF-8">
+  <title>Word Map - Three.js v1.0.4</title>
   <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background: #000;
-    }
+    body { margin: 0; overflow: hidden; background: #000; }
     #search {
       position: absolute;
       top: 10px;
@@ -36,7 +32,7 @@
 </head>
 <body>
   <input id="search" type="text" placeholder="Search word..." />
-  <div id="version">v1.0.3</div>
+  <div id="version">v1.0.4</div>
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
@@ -55,83 +51,58 @@
     controls.target.set(0, 0, 0);
     controls.update();
 
-    const URL = 'word_positions_1500000_clean.json?t=' + Date.now();
-    let allData = [];
+    // ✅ 仮データ：数点だけ表示できる最小構成（実環境では fetch に置き換え）
+    const allData = [
+      { word: "at", x: 0, y: 0, z: 0, rank: 1 },
+      { word: "to", x: 50, y: 10, z: 20, rank: 2 },
+      { word: "of", x: -40, y: 20, z: -10, rank: 3 },
+      { word: "in", x: 20, y: -30, z: 40, rank: 4 },
+      { word: "by", x: -60, y: -20, z: -30, rank: 5 }
+    ];
 
-    fetch(URL)
-      .then(res => res.json())
-      .then(json => {
-        allData = json
-          .filter(d => d.word && d.rank != null)
-          .sort((a, b) => a.rank - b.rank)
-          .slice(0, 150000);
-
-        const xExtent = d3.extent(allData, d => d.x);
-        const yExtent = d3.extent(allData, d => d.y);
-        const zExtent = d3.extent(allData, d => d.z);
-
-        const xScale = d3.scaleLinear().domain(xExtent).range([-300, 300]);
-        const yScale = d3.scaleLinear().domain(yExtent).range([-300, 300]);
-        const zScale = d3.scaleLinear().domain(zExtent).range([-300, 300]);
-
-        allData.forEach(d => {
-          d.x = xScale(d.x);
-          d.y = yScale(d.y);
-          d.z = zScale(d.z);
-        });
-
-        focusOn('at');
-      });
+    focusOn("at");
 
     function focusOn(targetWord) {
       console.log("Focusing on:", targetWord);
-      const target = allData.find(d => d.word.toLowerCase() === targetWord.toLowerCase());
-      if (!target) {
-        alert("Word not found: " + targetWord);
-        return;
-      }
+      const target = allData.find(d => d.word === targetWord);
+      if (!target) return alert("Word not found: " + targetWord);
 
       const nearby = allData.map(d => {
         const dx = d.x - target.x;
         const dy = d.y - target.y;
         const dz = d.z - target.z;
-        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
         return { ...d, dist };
-      }).sort((a, b) => a.dist - b.dist).slice(0, 1500);
+      }).sort((a, b) => a.dist - b.dist);
 
-      // 🎯 オブジェクトをクリアして再追加
-      while (scene.children.length > 0) {
-        scene.remove(scene.children[0]);
-      }
+      // 🔄 既存のオブジェクトを削除
+      while (scene.children.length > 0) scene.remove(scene.children[0]);
 
-      // ✅ 赤いデバッグ Sprite 原点に追加
+      // ✅ 赤いデバッグ Sprite（原点）
       const debug = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xff0000 }));
       debug.position.set(0, 0, 0);
-      debug.scale.set(50, 25, 1);
+      debug.scale.set(60, 30, 1);
       scene.add(debug);
 
-      // 🎨 Sprite作成
+      // 🟡 単語群表示（Sprite）
       const material = new THREE.SpriteMaterial({ color: 0xffffff });
       for (const d of nearby) {
         const sprite = new THREE.Sprite(material.clone());
         sprite.position.set(d.x, d.y, d.z);
-        sprite.scale.set(60, 30, 1); // 見やすく拡大
-        sprite.material.opacity = THREE.MathUtils.clamp(1 - Math.abs(d.z) / 300, 0.2, 1);
+        sprite.scale.set(60, 30, 1);
+        sprite.material.opacity = 1 - Math.abs(d.z) / 300;
         sprite.material.transparent = true;
         scene.add(sprite);
       }
 
-      // 視点調整
       controls.target.set(target.x, target.y, target.z);
       controls.update();
     }
 
-    document.getElementById('search').addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
+    document.getElementById("search").addEventListener("keydown", e => {
+      if (e.key === "Enter") {
         const word = e.target.value.trim();
-        if (word) {
-          focusOn(word);
-        }
+        if (word) focusOn(word);
       }
     });
 
@@ -142,12 +113,11 @@
     }
     animate();
 
-    window.addEventListener('resize', () => {
+    window.addEventListener("resize", () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
   </script>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
 </body>
 </html>
