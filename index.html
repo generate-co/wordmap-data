@@ -1,149 +1,136 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Word Map - Optimized</title>
+  <meta charset="UTF-8" />
+  <title>Word Map - Three.js v1.0.0</title>
   <style>
-    html, body {
+    body {
       margin: 0;
       overflow: hidden;
-      font-family: sans-serif;
       background: #000;
     }
-    canvas {
-      display: block;
-      background: #000;
+    #search {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1;
+      padding: 6px;
+      font-size: 16px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
     #version {
       position: absolute;
       top: 10px;
       right: 10px;
-      background: rgba(0, 0, 0, 0.7);
-      padding: 4px 8px;
-      font-size: 12px;
-      font-family: monospace;
+      z-index: 1;
       color: #fff;
+      font-family: monospace;
+      font-size: 12px;
+      background: rgba(0,0,0,0.5);
+      padding: 4px 8px;
       border-radius: 4px;
-      z-index: 100;
     }
   </style>
 </head>
 <body>
-  <div id="version">v0.5.2</div>
-  <canvas></canvas>
+  <input id="search" type="text" placeholder="Search word..." />
+  <div id="version">v1.0.0</div>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script>
-    const VERSION = "v0.5.2";
-    document.getElementById("version").textContent = VERSION;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 2000);
+    camera.position.z = 600;
 
-    const canvas = document.querySelector("canvas");
-    const ctx = canvas.getContext("2d");
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-    const WIDTH = window.innerWidth;
-    const HEIGHT = window.innerHeight;
-    canvas.width = WIDTH;
-    canvas.height = HEIGHT;
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.5;
 
-    const centerX = WIDTH / 2;
-    const centerY = HEIGHT / 2;
-    const focalLength = 400;
-    const baseFontSize = 10;
+    const loader = new THREE.TextureLoader();
+    const fontLoader = new THREE.FontLoader();
 
-    let data = [];
-    let angle = 0;
-    let dragging = false;
-    let lastX = 0;
-    let dragVelocity = 0;
-    const decay = 0.95;
-
-    const MAX_WORDS = 15000;
-    const URL = "word_positions_1500000_clean.json?t=" + Date.now();
+    const URL = 'word_positions_1500000_clean.json?t=' + Date.now();
+    let allData = [];
 
     fetch(URL)
       .then(res => res.json())
       .then(json => {
-        // ✅ 頻出順でランク昇順ソート → 上位15000語のみ使用
-        data = json
-          .filter(d => typeof d.rank === "number")
-          .sort((a, b) => a.rank - b.rank)
-          .slice(0, MAX_WORDS);
+        allData = json.filter(d => d.word && d.x != null && d.y != null && d.z != null);
 
-        // ✅ x/y/z を視覚用に正規化
-        const xExtent = d3.extent(data, d => d.x);
-        const yExtent = d3.extent(data, d => d.y);
-        const zExtent = d3.extent(data, d => d.z);
-
+        // 正規化
+        const xExtent = d3.extent(allData, d => d.x);
+        const yExtent = d3.extent(allData, d => d.y);
+        const zExtent = d3.extent(allData, d => d.z);
         const xScale = d3.scaleLinear().domain(xExtent).range([-300, 300]);
         const yScale = d3.scaleLinear().domain(yExtent).range([-300, 300]);
-        const zScale = d3.scaleLinear().domain(zExtent).range([-1.2, 1.2]);
+        const zScale = d3.scaleLinear().domain(zExtent).range([-300, 300]);
 
-        data.forEach(d => {
+        allData.forEach(d => {
           d.x = xScale(d.x);
           d.y = yScale(d.y);
           d.z = zScale(d.z);
         });
 
-        requestAnimationFrame(render);
+        focusOn('perform');
       });
 
-    // 🖱 マウスドラッグによる視点操作
-    canvas.addEventListener("mousedown", e => {
-      dragging = true;
-      lastX = e.clientX;
-    });
-    window.addEventListener("mousemove", e => {
-      if (dragging) {
-        const deltaX = e.clientX - lastX;
-        dragVelocity = deltaX * 0.005;
-        lastX = e.clientX;
+    function focusOn(targetWord) {
+      const target = allData.find(d => d.word.toLowerCase() === targetWord.toLowerCase());
+      if (!target) return alert("Word not found");
+
+      const nearby = allData.map(d => {
+        const dx = d.x - target.x;
+        const dy = d.y - target.y;
+        const dz = d.z - target.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        return { ...d, dist };
+      }).sort((a, b) => a.dist - b.dist).slice(0, 1500);
+
+      // 文字のSpriteを配置
+      const material = new THREE.SpriteMaterial({ color: 0xffffff });
+      for (const d of nearby) {
+        const sprite = new THREE.Sprite(material.clone());
+        sprite.position.set(d.x, d.y, d.z);
+        sprite.scale.set(20, 10, 1);
+        sprite.material.opacity = THREE.MathUtils.clamp(1 - Math.abs(d.z) / 300, 0.2, 1);
+        sprite.material.transparent = true;
+        scene.add(sprite);
       }
-    });
-    window.addEventListener("mouseup", () => {
-      dragging = false;
-    });
-
-    function render() {
-      ctx.clearRect(0, 0, WIDTH, HEIGHT);
-      ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-      if (!dragging) dragVelocity *= decay;
-      angle += dragVelocity + 0.0005;
-
-      const sinA = Math.sin(angle);
-      const cosA = Math.cos(angle);
-
-      for (let i = 0; i < data.length; i++) {
-        const d = data[i];
-
-        const x3D = d.x * cosA - d.z * sinA;
-        const z3D = d.x * sinA + d.z * cosA;
-        const y3D = d.y;
-
-        const perspective = focalLength / (focalLength - z3D);
-        const screenX = x3D * perspective + centerX;
-        const screenY = y3D * perspective + centerY;
-        const fontSize = baseFontSize * perspective;
-
-        const maxZ = 1.5;
-        const alpha = Math.max(0.1, 1 - (z3D / maxZ));
-
-        if (
-          screenX < -50 || screenX > WIDTH + 50 ||
-          screenY < -50 || screenY > HEIGHT + 50 ||
-          fontSize < 4 || fontSize > 100
-        ) continue;
-
-        ctx.font = `${fontSize}px sans-serif`;
-        ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(d.word, screenX, screenY);
-      }
-
-      requestAnimationFrame(render);
     }
+
+    document.getElementById('search').addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const word = e.target.value.trim();
+        if (word) {
+          // Clear scene and re-focus
+          while (scene.children.length > 0) {
+            scene.remove(scene.children[0]);
+          }
+          focusOn(word);
+        }
+      }
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
   </script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
 </body>
 </html>
