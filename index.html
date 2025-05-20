@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Word Map - Canvas</title>
+  <title>Word Map - ZoomFont</title>
   <style>
     html, body {
       margin: 0;
@@ -52,13 +52,13 @@
 </head>
 <body>
   <input id="search" type="text" placeholder="Search word..." />
-  <div id="version">v0.3.2</div>
+  <div id="version">v0.3.4</div>
   <div id="counter">0 words</div>
   <canvas></canvas>
 
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script>
-    const VERSION = "v0.3.3";
+    const VERSION = "v0.3.4";
     document.getElementById("version").textContent = VERSION;
 
     const canvas = document.querySelector("canvas");
@@ -71,7 +71,7 @@
     canvas.width = WIDTH;
     canvas.height = HEIGHT;
 
-    const URL = "word_positions_1500000_clean.json?t=" + Date.now(); // キャッシュ防止
+    const URL = "word_positions_1500000_clean.json?t=" + Date.now();
     let data = [];
     let transform = d3.zoomIdentity;
     let xScale, yScale;
@@ -99,11 +99,11 @@
     function render() {
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
       ctx.save();
-      ctx.translate(transform.x, transform.y);
-      ctx.scale(transform.k, transform.k);
 
-      const baseFontSize = 10;
       const zoomK = transform.k;
+      const tx = transform.x;
+      const ty = transform.y;
+      const baseFontSize = 10;
       let visibleCount = 0;
 
       for (let i = 0; i < data.length; i++) {
@@ -111,34 +111,36 @@
         const x = xScale(d.x);
         const y = yScale(d.y);
 
-        // 実スクリーン座標に変換
-        const screenX = x * zoomK + transform.x;
-        const screenY = y * zoomK + transform.y;
+        const screenX = x * zoomK + tx;
+        const screenY = y * zoomK + ty;
 
-        // 画面外の単語は描画しない
         if (
           screenX < -50 || screenX > WIDTH + 50 ||
           screenY < -50 || screenY > HEIGHT + 50
-        ) {
+        ) continue;
+
+        const fontSize = baseFontSize * zoomK;
+
+        if (fontSize < 8) {
+          // 点で表示
+          ctx.beginPath();
+          ctx.arc(screenX, screenY, 1.2, 0, 2 * Math.PI);
+          ctx.fillStyle = "#000";
+          ctx.fill();
           continue;
         }
 
-        // フォントが小さすぎる場合はスキップ
-        const screenFontSize = baseFontSize * zoomK;
-        if (screenFontSize < 5) continue;
-
-        ctx.font = `${baseFontSize}px sans-serif`;
+        // テキストで表示
+        ctx.font = `${fontSize}px sans-serif`;
         ctx.fillStyle = "#000";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(d.word, x, y);
+        ctx.fillText(d.word, screenX, screenY);
 
         visibleCount++;
       }
 
       ctx.restore();
-
-      // 表示中語数の更新
       counter.textContent = `${visibleCount} words`;
     }
 
