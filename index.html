@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Word Map - Three.js v1.0.2</title>
+  <title>Word Map - Three.js v1.0.3</title>
   <style>
     body {
       margin: 0;
@@ -36,7 +36,7 @@
 </head>
 <body>
   <input id="search" type="text" placeholder="Search word..." />
-  <div id="version">v1.0.2</div>
+  <div id="version">v1.0.3</div>
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
@@ -80,7 +80,7 @@
           d.z = zScale(d.z);
         });
 
-        focusOn('perform');
+        focusOn('at');
       });
 
     function focusOn(targetWord) {
@@ -104,12 +104,18 @@
         scene.remove(scene.children[0]);
       }
 
+      // ✅ 赤いデバッグ Sprite 原点に追加
+      const debug = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xff0000 }));
+      debug.position.set(0, 0, 0);
+      debug.scale.set(50, 25, 1);
+      scene.add(debug);
+
       // 🎨 Sprite作成
       const material = new THREE.SpriteMaterial({ color: 0xffffff });
       for (const d of nearby) {
         const sprite = new THREE.Sprite(material.clone());
         sprite.position.set(d.x, d.y, d.z);
-        sprite.scale.set(40, 20, 1); // サイズ調整
+        sprite.scale.set(60, 30, 1); // 見やすく拡大
         sprite.material.opacity = THREE.MathUtils.clamp(1 - Math.abs(d.z) / 300, 0.2, 1);
         sprite.material.transparent = true;
         scene.add(sprite);
