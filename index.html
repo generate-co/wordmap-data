@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Word Map Visualization</title>
+  <style>
+    body { margin: 0; background: #fff; font-family: sans-serif; }
+    svg { width: 100vw; height: 100vh; display: block; }
+    text { font-size: 10px; fill: black; pointer-events: all; }
+  </style>
+</head>
+<body>
+  <svg></svg>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    const url = "word_positions_1500000_clean.json"; // 同じディレクトリ内
+
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        const svg = d3.select("svg");
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        const xExtent = d3.extent(data, d => d.x);
+        const yExtent = d3.extent(data, d => d.y);
+        const xScale = d3.scaleLinear().domain(xExtent).range([50, width - 50]);
+        const yScale = d3.scaleLinear().domain(yExtent).range([50, height - 50]);
+
+        svg.selectAll("text")
+          .data(data.slice(0, 500)) // 初期は軽く表示
+          .enter()
+          .append("text")
+          .text(d => d.word)
+          .attr("x", d => xScale(d.x))
+          .attr("y", d => yScale(d.y))
+          .on("click", (event, d) => {
+            alert(`Word: ${d.word}`);
+          });
+      });
+  </script>
+</body>
+</html>
