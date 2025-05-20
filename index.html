@@ -2,171 +2,134 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Word Map - ZoomFont</title>
+  <title>Word Map - 3D Interactive</title>
   <style>
     html, body {
       margin: 0;
       overflow: hidden;
       font-family: sans-serif;
+      background: #000;
     }
     canvas {
       display: block;
-      background: #fff;
-    }
-    #search {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 100;
-      padding: 6px;
-      font-size: 16px;
-      background: rgba(255,255,255,0.9);
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      background: #000;
     }
     #version {
       position: absolute;
       top: 10px;
       right: 10px;
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(0, 0, 0, 0.7);
       padding: 4px 8px;
       font-size: 12px;
       font-family: monospace;
-      color: #555;
-      border-radius: 4px;
-      z-index: 100;
-    }
-    #counter {
-      position: absolute;
-      bottom: 10px;
-      right: 10px;
-      background: rgba(255, 255, 255, 0.9);
-      padding: 4px 8px;
-      font-size: 12px;
-      font-family: monospace;
-      color: #555;
+      color: #fff;
       border-radius: 4px;
       z-index: 100;
     }
   </style>
 </head>
 <body>
-  <input id="search" type="text" placeholder="Search word..." />
-  <div id="version">v0.3.4</div>
-  <div id="counter">0 words</div>
+  <div id="version">v0.5.0</div>
   <canvas></canvas>
 
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script>
-    const VERSION = "v0.3.4";
+    const VERSION = "v0.5.0";
     document.getElementById("version").textContent = VERSION;
 
     const canvas = document.querySelector("canvas");
     const ctx = canvas.getContext("2d");
-    const searchInput = document.getElementById("search");
-    const counter = document.getElementById("counter");
 
     const WIDTH = window.innerWidth;
     const HEIGHT = window.innerHeight;
     canvas.width = WIDTH;
     canvas.height = HEIGHT;
 
-    const URL = "word_positions_1500000_clean.json?t=" + Date.now();
+    const centerX = WIDTH / 2;
+    const centerY = HEIGHT / 2;
+    const focalLength = 400;
+    const baseFontSize = 10;
+
     let data = [];
-    let transform = d3.zoomIdentity;
-    let xScale, yScale;
+    let angle = 0;
+    let dragging = false;
+    let lastX = 0;
+    let dragVelocity = 0;
+    let decay = 0.95;
+
+    const URL = "word_positions_1500000_clean.json?t=" + Date.now();
 
     fetch(URL)
       .then(res => res.json())
       .then(json => {
         data = json;
-        const xExtent = d3.extent(data, d => d.x);
-        const yExtent = d3.extent(data, d => d.y);
-        xScale = d3.scaleLinear().domain(xExtent).range([0, WIDTH]);
-        yScale = d3.scaleLinear().domain(yExtent).range([0, HEIGHT]);
-        render();
+        requestAnimationFrame(render);
       });
 
-    const zoom = d3.zoom()
-      .scaleExtent([0.05, 50])
-      .on("zoom", (event) => {
-        transform = event.transform;
-        render();
-      });
-
-    d3.select(canvas).call(zoom);
+    // 🖱 マウス操作で回転角度を制御
+    canvas.addEventListener("mousedown", e => {
+      dragging = true;
+      lastX = e.clientX;
+    });
+    window.addEventListener("mousemove", e => {
+      if (dragging) {
+        const deltaX = e.clientX - lastX;
+        dragVelocity = deltaX * 0.005;
+        lastX = e.clientX;
+      }
+    });
+    window.addEventListener("mouseup", () => {
+      dragging = false;
+    });
 
     function render() {
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
-      ctx.save();
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-      const zoomK = transform.k;
-      const tx = transform.x;
-      const ty = transform.y;
-      const baseFontSize = 10;
-      let visibleCount = 0;
+      // 回転
+      if (!dragging) {
+        dragVelocity *= decay;
+      }
+      angle += dragVelocity + 0.0005;
 
-      for (let i = 0; i < data.length; i++) {
-        const d = data[i];
-        const x = xScale(d.x);
-        const y = yScale(d.y);
+      const sinA = Math.sin(angle);
+      const cosA = Math.cos(angle);
 
-        const screenX = x * zoomK + tx;
-        const screenY = y * zoomK + ty;
+      const sorted = [...data].sort((a, b) => b.z - a.z); // 奥から手前へ
+
+      for (let i = 0; i < sorted.length; i++) {
+        const d = sorted[i];
+
+        // Y軸回転
+        const x3D = d.x * cosA - d.z * sinA;
+        const z3D = d.x * sinA + d.z * cosA;
+        const y3D = d.y;
+
+        const perspective = focalLength / (focalLength - z3D);
+        const screenX = x3D * perspective + centerX;
+        const screenY = y3D * perspective + centerY;
+        const fontSize = baseFontSize * perspective;
+
+        // αは z の遠さに応じて調整（近いほど濃い）
+        const maxZ = 1.5;
+        const alpha = Math.max(0.1, 1 - (z3D / maxZ)); // α下限を0.1に
 
         if (
           screenX < -50 || screenX > WIDTH + 50 ||
-          screenY < -50 || screenY > HEIGHT + 50
+          screenY < -50 || screenY > HEIGHT + 50 ||
+          fontSize < 4 || fontSize > 100
         ) continue;
 
-        const fontSize = baseFontSize * zoomK;
-
-        if (fontSize < 8) {
-          // 点で表示
-          ctx.beginPath();
-          ctx.arc(screenX, screenY, 1.2, 0, 2 * Math.PI);
-          ctx.fillStyle = "#000";
-          ctx.fill();
-          continue;
-        }
-
-        // テキストで表示
         ctx.font = `${fontSize}px sans-serif`;
-        ctx.fillStyle = "#000";
+        ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(d.word, screenX, screenY);
-
-        visibleCount++;
       }
 
-      ctx.restore();
-      counter.textContent = `${visibleCount} words`;
+      requestAnimationFrame(render);
     }
-
-    searchInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        const word = searchInput.value.trim().toLowerCase();
-        const found = data.find(d => d.word.toLowerCase() === word);
-        if (found) {
-          const x = xScale(found.x);
-          const y = yScale(found.y);
-          const targetScale = 8;
-          const tx = WIDTH / 2 - x * targetScale;
-          const ty = HEIGHT / 2 - y * targetScale;
-
-          d3.select(canvas)
-            .transition()
-            .duration(600)
-            .call(
-              zoom.transform,
-              d3.zoomIdentity.translate(tx, ty).scale(targetScale)
-            );
-        } else {
-          alert("Word not found.");
-        }
-      }
-    });
   </script>
 </body>
 </html>
