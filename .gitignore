@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# OSやエディタが作る一時ファイル
+Thumbs.db
+*.log
+*.tmp
+*.swp
