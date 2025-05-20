@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Word Map - Three.js v1.0.6r</title>
+  <title>Word Map - Three.js v1.1.0</title>
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
     #search {
@@ -29,14 +29,23 @@
       border-radius: 4px;
     }
   </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 <body>
   <input id="search" type="text" placeholder="Search word..." />
-  <div id="version">v1.0.6r</div>
+  <div id="version">v1.1.0</div>
 
   <script type="module">
-    import * as THREE from './libs/three.module.js';
-    import { OrbitControls } from './libs/OrbitControls.js';
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 2000);
@@ -48,24 +57,33 @@
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.5;
-    controls.target.set(0, 0, 0);
-    controls.update();
+    controls.autoRotateSpeed = 0.3;
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
 
-    // 仮データ（後で入れ替える）
-    const allData = [
-      { word: "at", x: 0, y: 0, z: 0, rank: 1 },
-      { word: "to", x: 50, y: 10, z: 20, rank: 2 },
-      { word: "of", x: -40, y: 20, z: -10, rank: 3 },
-      { word: "in", x: 20, y: -30, z: 40, rank: 4 },
-      { word: "by", x: -60, y: -20, z: -30, rank: 5 }
-    ];
+    let allData = [];
 
-    focusOn("at");
+    // 正規化用関数
+    function normalize(data) {
+      const xs = data.map(d => d.x), ys = data.map(d => d.y), zs = data.map(d => d.z);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const minZ = Math.min(...zs), maxZ = Math.max(...zs);
 
-    function focusOn(targetWord) {
-      const target = allData.find(d => d.word === targetWord);
-      if (!target) return alert("Word not found: " + targetWord);
+      return data.map(d => ({
+        ...d,
+        x: ((d.x - minX) / (maxX - minX) - 0.5) * 1000,
+        y: ((d.y - minY) / (maxY - minY) - 0.5) * 1000,
+        z: ((d.z - minZ) / (maxZ - minZ) - 0.5) * 1000
+      }));
+    }
+
+    function focusOn(word) {
+      const target = allData.find(d => d.word === word);
+      if (!target) {
+        alert("Word not found: " + word);
+        return;
+      }
 
       const nearby = allData.map(d => {
         const dx = d.x - target.x;
@@ -73,22 +91,45 @@
         const dz = d.z - target.z;
         const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
         return { ...d, dist };
-      }).sort((a, b) => a.dist - b.dist);
+      }).sort((a, b) => a.dist - b.dist).slice(0, 1500);
 
+      // Clear scene
       while (scene.children.length > 0) scene.remove(scene.children[0]);
 
+      // Add sprites
       for (const d of nearby) {
-        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }));
+        const fontSize = Math.max(10, 100 - d.dist * 0.1);
+        const alpha = Math.max(0.2, 1 - d.dist / 1000);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, 256, 64);
+        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(d.word, 128, 32);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(material);
         sprite.position.set(d.x, d.y, d.z);
-        sprite.scale.set(60, 30, 1);
-        sprite.material.opacity = 1 - Math.abs(d.z) / 300;
-        sprite.material.transparent = true;
+        sprite.scale.set(fontSize * 2, fontSize, 1);
         scene.add(sprite);
       }
 
       controls.target.set(target.x, target.y, target.z);
       controls.update();
     }
+
+    fetch('./word_positions_150000.json')
+      .then(res => res.json())
+      .then(data => {
+        allData = normalize(data);
+        focusOn("at");
+      });
 
     document.getElementById("search").addEventListener("keydown", e => {
       if (e.key === "Enter") {
