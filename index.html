@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Word Map - Three.js v1.0.5</title>
+  <meta charset="UTF-8" />
+  <title>Word Map - Three.js v1.0.6</title>
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
     #search {
@@ -32,7 +32,8 @@
 </head>
 <body>
   <input id="search" type="text" placeholder="Search word..." />
-  <div id="version">v1.0.4</div>
+  <div id="version">v1.0.6</div>
+
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
@@ -51,7 +52,7 @@
     controls.target.set(0, 0, 0);
     controls.update();
 
-    // ✅ 仮データ：数点だけ表示できる最小構成（実環境では fetch に置き換え）
+    // 仮データ：5単語
     const allData = [
       { word: "at", x: 0, y: 0, z: 0, rank: 1 },
       { word: "to", x: 50, y: 10, z: 20, rank: 2 },
@@ -63,7 +64,6 @@
     focusOn("at");
 
     function focusOn(targetWord) {
-      console.log("Focusing on:", targetWord);
       const target = allData.find(d => d.word === targetWord);
       if (!target) return alert("Word not found: " + targetWord);
 
@@ -75,19 +75,16 @@
         return { ...d, dist };
       }).sort((a, b) => a.dist - b.dist);
 
-      // 🔄 既存のオブジェクトを削除
       while (scene.children.length > 0) scene.remove(scene.children[0]);
 
-      // ✅ 赤いデバッグ Sprite（原点）
+      // 原点マーカー
       const debug = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xff0000 }));
       debug.position.set(0, 0, 0);
       debug.scale.set(60, 30, 1);
       scene.add(debug);
 
-      // 🟡 単語群表示（Sprite）
-      const material = new THREE.SpriteMaterial({ color: 0xffffff });
       for (const d of nearby) {
-        const sprite = new THREE.Sprite(material.clone());
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }));
         sprite.position.set(d.x, d.y, d.z);
         sprite.scale.set(60, 30, 1);
         sprite.material.opacity = 1 - Math.abs(d.z) / 300;
