@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Word Map - Three.js v1.0.6r</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; }
+    #search {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1;
+      padding: 6px;
+      font-size: 16px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    #version {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1;
+      color: #fff;
+      font-family: monospace;
+      font-size: 12px;
+      background: rgba(0,0,0,0.5);
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <input id="search" type="text" placeholder="Search word..." />
+  <div id="version">v1.0.6r</div>
+
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 2000);
+    camera.position.z = 600;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.5;
+    controls.target.set(0, 0, 0);
+    controls.update();
+
+    // 仮データ
+    const allData = [
+      { word: "at", x: 0, y: 0, z: 0, rank: 1 },
+      { word: "to", x: 50, y: 10, z: 20, rank: 2 },
+      { word: "of", x: -40, y: 20, z: -10, rank: 3 },
+      { word: "in", x: 20, y: -30, z: 40, rank: 4 },
+      { word: "by", x: -60, y: -20, z: -30, rank: 5 }
+    ];
+
+    focusOn("at");
+
+    function focusOn(targetWord) {
+      const target = allData.find(d => d.word === targetWord);
+      if (!target) return alert("Word not found: " + targetWord);
+
+      const nearby = allData.map(d => {
+        const dx = d.x - target.x;
+        const dy = d.y - target.y;
+        const dz = d.z - target.z;
+        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        return { ...d, dist };
+      }).sort((a, b) => a.dist - b.dist);
+
+      while (scene.children.length > 0) scene.remove(scene.children[0]);
+
+      for (const d of nearby) {
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }));
+        sprite.position.set(d.x, d.y, d.z);
+        sprite.scale.set(60, 30, 1);
+        sprite.material.opacity = 1 - Math.abs(d.z) / 300;
+        sprite.material.transparent = true;
+        scene.add(sprite);
+      }
+
+      controls.target.set(target.x, target.y, target.z);
+      controls.update();
+    }
+
+    document.getElementById("search").addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        const word = e.target.value.trim();
+        if (word) focusOn(word);
+      }
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
